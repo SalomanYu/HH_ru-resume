@@ -15,9 +15,10 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 
-# from required_variables import hh_variables
-from settings import HH_VARIABLES, ERROR_MESSAGE, SUCCESS_MESSAGE, WARNING_MESSAGE, Experience, ResumeItem, Training, University, WorkExperience
+from settings import HH_VARIABLES, Experience, ResumeItem, Training, University, WorkExperience
+from settings import logging
 import settings
+
 
 class Resume:
     def __init__(self):
@@ -39,10 +40,9 @@ class Resume:
             
             for item in range(len(self.parsing_urls)): # Запускаем цикл по отфильтрованным по ссылкам категории
                 self.address = ''
-                print("\n",SUCCESS_MESSAGE+f'\t{self.city}-{self.address}\n') # Принт просто для того, чтобы понимать с какой категорией сейчас работаем
+                logging.info("City, were are finding - %s", self.city)
                 # Этот цикл отвечает за перелистывание страниц
                 url = f'https://{self.city}.hh.ru' + self.parsing_urls[item].url
-                print(url)
                 for page_num in range(250): # 250
                     self.page_url = f"{url}&page={page_num}"
                     self.parser_resume_list(self.page_url)
@@ -53,74 +53,47 @@ class Resume:
         """
 
         try: # Пробуем подключиться к странице пагинатора
-            print('Собираем список резюме...')
             req = requests.get(url, headers=self.headers) # открываем страницу со списком резюме
             soup = BeautifulSoup(req.text, 'lxml')
     
             # Создаем список ссылок всех резюме
             resume_urls_list = [f"https://{self.city}.hh.ru{item['href']}" for item in soup.find_all('a', class_='resume-search-item__name')]        
-            print('Запускаем 4 потока...')
+            logging.info("Started four processes for parsing")
             with Pool(4) as process:
-                # Создаем 4 потока
                 process.map_async(  func=self.parse_resume, # Функция, которая будет вызываться с аргументом
                                     iterable=resume_urls_list, # Список аргументов, которые будут передаваться по очереди
-                                    callback=self.data_resume_list, # Что произойдет после завершения многопотока
-                                    error_callback=lambda x:print(f'Thread error --> {x}') # Что будет, если произодет ошибка в многоптоке
+                                    error_callback=lambda x:logging.error('Thread error --> %s', x) # Что будет, если произодет ошибка в многоптоке
                 )
-                # process.map_async(  func=self.parse_resume, # Функция, которая будет вызываться с аргументом
-                #                     iterable=resume_urls_list, # Список аргументов, которые будут передаваться по очереди
-                #                     # callback=self.data_resume_list, # Что произойдет после завершения многопотока
-                #                     error_callback=lambda x:print(f'Thread error --> {x}') # Что будет, если произодет ошибка в многоптоке
-                # )
                 process.close()
                 process.join()
             return resume_urls_list
         except requests.exceptions.ConnectionError:
-            print(ERROR_MESSAGE+'\tНе удалось подключиться к сети...')
-            print(WARNING_MESSAGE+'\tПродолжим работу через минуту...')
-            time.sleep(60)
-    
-    def data_resume_list(self, response:list) -> None:
-        """ Функция, срабатывающая после завершения многопоточного парсинга. Она будет записывать спарсенные данные в таблицы"""
-
-        print('Завершение работы многопоточности...')
-        for row in response:
-            try:
-                if isinstance(row[0], tuple): # Условие необходимо для резюме, у которых несколько мест работы. Поэтому они возвращают список с кортежами строк для записи в БД
-                    self.add_to_table(self.name_db_table, row, many_rows=True)
-                    print('Записали в таблицу инфу о списке резюме')
-                else: # Здесь строки записываются по одному
-                    self.add_to_table(self.name_db_table, row)
-                
-            except BaseException as error:
-                print(ERROR_MESSAGE+'\tчет не получилось записать ', error)
-                break
-        return
+            logging.error("Internet-connection failed.")            
+            logging.debug("Let`s try to connect in two minute")            
+            time.sleep(120)
 
     def parse_resume(self, url: str) -> tuple:
         """Функция запускает методы парсинга отдельных блоков резюме и передает результат в виде списка или списка кортежей функции data_resume_list"""
 
-        print('Парсим резюме...')
+        logging.info('Parsing resume...')
         try:
             self.req = requests.get(url, headers=self.headers)
             soup = BeautifulSoup(self.req.text, 'lxml')
             
             data = self.collect_all_resume_info(soup, url) # Мы передаем soup и затем переопределяем его, чтобы из-за многопоточности не было смешиваний резюме
-            return data
-            # try:
-            #     if isinstance(data[0], tuple): # Условие необходимо для резюме, у которых несколько мест работы. Поэтому они возвращают список с кортежами строк для записи в БД
-            #         self.add_to_table(self.name_db_table, data, many_rows=True)
-            #         print('Записали в таблицу инфу о списке резюме')
-            #     else: # Здесь строки записываются по одному
-            #         self.add_to_table(self.name_db_table, data)
+            try:
+                if isinstance(data[0], tuple): # Условие необходимо для резюме, у которых несколько мест работы. Поэтому они возвращают список с кортежами строк для записи в БД
+                    self.add_to_table(self.name_db_table, data, many_rows=True)
+                    print('Записали в таблицу инфу о списке резюме')
+                else: # Здесь строки записываются по одному
+                    self.add_to_table(self.name_db_table, data)
                 
-            # except BaseException as error:
-            #     print(ERROR_MESSAGE+'\tчет не получилось записать ', error)
-            # return 
+            except BaseException as error:
+                logging.error('Failed to write resume in database... (%s)', url)
+            return 
             
         except BaseException as error:
-            print(error)
-            print(ERROR_MESSAGE+'\tНе получилось спарсить резюме: ', url)
+            logging.error('Failed to parse resume. Problem: %s. Resume url - %s', error, url)
             return []
 
     def collect_all_resume_info(self, soup: BeautifulSoup, url: str) -> ResumeItem | list[ResumeItem]:
@@ -129,7 +102,6 @@ class Resume:
         experience, work_periods  = self.get_experience(soup, url)        
         univer = self.get_education_info(soup)
         specializations = self.get_specialization(soup)
-        # training_name, training_direction, training_year = self.get_training(soup) 
         training = self.get_training(soup)
         languages = self.get_languages(soup)
         self.salary = self.get_salary(soup)
@@ -155,6 +127,7 @@ class Resume:
                                 training_year=training.year, branch='', subbranch='', experience_interval='', experience_duration='', 
                                 experience_post='', url=url)
 
+
     def get_title(self, soup: BeautifulSoup) -> str:
         """Метод получения наименования резюме"""
      
@@ -164,7 +137,7 @@ class Resume:
         
             return title
         except BaseException as error:
-            print(WARNING_MESSAGE+'\tОтпало НАИМЕНОВАНИЕ: ', error)
+            logging.warning("Has no NAME")
             return ''
 
     def get_salary(self, soup: BeautifulSoup) -> str:
@@ -179,7 +152,7 @@ class Resume:
             else: 
                 return ''
         except BaseException as error:
-            print(WARNING_MESSAGE+'\tОтпала ЗАРПЛАТА: ', error)
+            logging.warning("Has no SALARY")
             return ''
 
     def get_specialization(self, soup: BeautifulSoup) -> str:
@@ -188,7 +161,7 @@ class Resume:
             specializations =  [item.text for item in self.soup.find_all('li', class_='resume-block__specialization')] # Забираем перечень специализаций
             return " | ".join(specializations)
         except BaseException as error:
-            print(WARNING_MESSAGE+'\tОтпала специализация: ', error)
+            logging.warning("Has no SPECIALIZATION")
             return ''
 
 
@@ -223,7 +196,7 @@ class Resume:
                     return University(name=education_type, direction='', year='')
 
         except BaseException as error:
-            print(WARNING_MESSAGE+'\tОтпало ОБРАЗОВАНИЕ: ', error)
+            logging.warning("Has no EDUCATION")
             return  University(name='', direction='', year='')
 
     def get_skills(self, soup: BeautifulSoup) -> str:
@@ -241,7 +214,7 @@ class Resume:
             else:
                 return ''
         except AttributeError:
-            print(WARNING_MESSAGE+'\tОТПАЛИ СКИЛЛЫ')
+            logging.warning("Has no SKILLS")
             return ''
 
     def get_languages(self, soup: BeautifulSoup) -> str:
@@ -257,7 +230,7 @@ class Resume:
 
             return " | ".join(edited_languages)
         except BaseException as error:
-            print(WARNING_MESSAGE+'\tОтпали ЯЗЫКИ: ', error)
+            logging.warning("Has no LANGUAGES")
             return ''
 
     def get_experience(self, soup, url) -> Experience:
@@ -328,7 +301,7 @@ class Resume:
                         )
             return Experience(global_experience=self.total_work_experience, work_places=self.work_periods)
         except BaseException as error:
-            print(WARNING_MESSAGE+'\tОтпал ОПЫТ РАБОТЫ: ', error)
+            logging.warning("Has no WORK EXPERIENCE")
             self.experience = Experience(global_experience='', work_places={
                     WorkExperience(post='', interval='', branch='', subbranch='', duration='')
                     })
@@ -360,7 +333,7 @@ class Resume:
             else:
                 raise BaseException
         except BaseException:
-            print(WARNING_MESSAGE+'\tОТПАЛИ КУРСЫ')
+            logging.warning("Has no COURSES")
             return Training(name='', direction='', year='')
 
     
@@ -422,19 +395,17 @@ class Resume:
                     f"advanced_training_year, branch, subbranch, experience_interval, experience_duration, experience_post, url) VALUES({','.join('?' for i in range(20))})"
 
         if many_rows:
-            # Результат выполнения команды в скобках VALUES превратится в VALUES(?,?,?, ?n), n = len(data) 
-            cursor.executemany(pattern, data)
+            cursor.executemany(pattern, data) # Результат выполнения команды в скобках VALUES превратится в VALUES(?,?,?, ?n), n = len(data)
         else:
             cursor.execute(pattern, data)
  
         db.commit()
         db.close()
         if isinstance(data, list):
-            print(SUCCESS_MESSAGE + f"\t{data[0].name} добавлен")
+            logging.info("%s - added to database.", data[0].name)
         else:
-            print(SUCCESS_MESSAGE + f"\t{data.name} добавлен")
+            logging.info("%s - added to database.", data.name)
 
 if __name__ == "__main__":  
     bot = Resume()
     bot.start()
-    # bot.parse_resume('https://kazan.hh.ru/resume/6d8b504100083e0dfc0039ed1f663338376652?query=junior+product+manager&source=search&hhtmFrom=resumes_catalog')
