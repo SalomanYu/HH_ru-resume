@@ -196,6 +196,7 @@ class ProfessionParser(Resume):
 
 
 if __name__ == "__main__":
+    print("All info and statuses writes in LOGGING/step_1.log file\nProgram working....")
     excel_data = connect_to_excel()
 
     for item in range(len(excel_data.names)):
@@ -208,3 +209,4 @@ if __name__ == "__main__":
                         profession_weight_in_level=excel_data.weights_in_level[item]
                     )
         profession.start()
+    print('Finished.')
