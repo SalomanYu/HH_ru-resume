@@ -17,7 +17,7 @@ from settings import logging
 
 
 class ProfessionParser(Resume):
-    def __init__(self, profession_name:str, profession_level:int, profession_weight_in_level:int, profession_weight_in_group:int):
+    def __init__(self, name_db_table: str,  profession_name:str, profession_level:int, profession_weight_in_level:int, profession_weight_in_group:int):
         
         super().__init__()
         self.profession_name = profession_name
@@ -26,8 +26,8 @@ class ProfessionParser(Resume):
         self.profession_level = profession_level
 
         self.address = '' # категория
-        self.name_db_table = 'resumes'
-        self.name_database = 'Professions'
+        self.name_db_table = name_db_table
+        self.name_database = DATABASE_NAME
 
     def start(self):
 
@@ -197,10 +197,11 @@ class ProfessionParser(Resume):
 
 if __name__ == "__main__":
     excel_data = connect_to_excel()
-    # print(excel_data)
+
     for item in range(len(excel_data.names)):
         logging.debug('Searching profession called - %s', excel_data.names[item])
         profession = ProfessionParser(
+                        name_db_table='Accountment',
                         profession_name=excel_data.names[item], 
                         profession_level=excel_data.levels[item],
                         profession_weight_in_group=excel_data.weights_in_group[item], 

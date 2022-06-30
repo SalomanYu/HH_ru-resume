@@ -342,11 +342,12 @@ class Resume:
         Принимает: название БД"""
        
         self.db_name = db_name
-        os.makedirs('SQL', exist_ok=True) # Создаем папку SQL, если она еще не создана
         today = date.today()
+        month_folder = f'SQL/Month:{str(today.month)}.{str(today.year)}' # For history check
+        os.makedirs(month_folder, exist_ok=True) # Создаем папку SQL, если она еще не создана
 
         # Будет создана База данных, если в папке SQL не будет файла db_name.db
-        db = sqlite3.connect(f'SQL/{self.db_name}({str(today.year)}_{str(today.month)}).db') 
+        db = sqlite3.connect(f'{month_folder}/{self.db_name}.db') 
         cursor = db.cursor()
         return cursor, db
         

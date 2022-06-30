@@ -4,16 +4,20 @@ import sqlite3
 import logging
 import xlrd
 
-
-logging.basicConfig(filename='LOGGING/step_1.log', encoding='utf-8', level=logging.DEBUG)
-logging.getLogger("urllib3").setLevel(logging.WARNING) # Без этого urllib3 выводит страшные большие белые сообщения
-logging.getLogger('selenium').setLevel(logging.WARNING)
-
-
+LOG_FILENAME = 'LOGGING/step_1.log'
 SUCCESS_MESSAGE = '\033[2;30;42m [SUCCESS] \033[0;0m' 
 WARNING_MESSAGE = '\033[2;30;43m [WARNING] \033[0;0m'
 ERROR_MESSAGE = '\033[2;30;41m [ ERROR ] \033[0;0m'
-EXCEL_PATH = "Excel/11 Офисные службы.xlsx"
+EXCEL_PATH = "Excel/accountment_prof.xlsx"
+DATABASE_NAME = 'Professions'
+
+log_file = open(LOG_FILENAME, 'w') 
+log_file.close()
+
+logging.basicConfig(filename=LOG_FILENAME, encoding='utf-8', level=logging.DEBUG)
+logging.getLogger("urllib3").setLevel(logging.WARNING) # Без этого urllib3 выводит страшные большие белые сообщения
+logging.getLogger('selenium').setLevel(logging.WARNING)
+
 
 class ExcelData(NamedTuple):
     names: tuple
@@ -23,7 +27,8 @@ class ExcelData(NamedTuple):
 
 
 def connect_to_excel() -> ExcelData:
-    last_row_num = 49
+    last_row_num = 73
+
     book_reader = xlrd.open_workbook(EXCEL_PATH)
     work_sheet = book_reader.sheet_by_name('Вариации названий')
     table_titles = work_sheet.row_values(0)
