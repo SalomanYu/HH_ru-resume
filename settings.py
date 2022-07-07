@@ -93,6 +93,10 @@ class ResumeItem(NamedTuple):
     url: str
 
 
+class ResumeGroup:
+    id: ResumeProfessionItem.url
+    items: set[ResumeProfessionItem]
+
 class Training(NamedTuple):
     name: str
     direction: str

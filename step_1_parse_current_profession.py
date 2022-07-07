@@ -1,5 +1,8 @@
 from hh_parser import Resume
 
+from rich.console import Console
+from rich.progress import track
+
 from multiprocessing import Pool
 from time import sleep
 
@@ -11,7 +14,6 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
-import xlrd
 from settings import * 
 from settings import logging
 
@@ -75,6 +77,9 @@ class ProfessionParser(Resume):
             for item in all_resumes:
                 if item.text.lower() == self.profession_name.lower():
                     resume_urls_list.append(f"https://hh.ru{item['href']}")
+            # for item in track(range(len(all_resumes)), description="[green]Finding required resumes"):
+            #     if all_resumes[item].text.lower() == self.profession_name.lower():
+            #         resume_urls_list.append(f"https://hh.ru{all_resumes[item]['href']}")
             return resume_urls_list, len(all_resumes)
             
         except (BaseException, requests.exceptions.ConnectionError) as err:
@@ -198,9 +203,14 @@ class ProfessionParser(Resume):
 if __name__ == "__main__":
     print("All info and statuses writes in LOGGING/step_1.log file\nProgram working....")
     excel_data = connect_to_excel()
-
-    for item in range(len(excel_data.names)):
+    console = Console()
+    console.log("[green] Start program...")
+    console.log("[blue] All info and statuses writes in LOGGING/step_1.log file...")
+    # with console.status("[bold yellow]Parsing names...") as status:
+        # while True:
+    for item in track(range(12, 15), description=['[green]Finding resumes by profession name ']):
         logging.debug('Searching profession called - %s', excel_data.names[item])
+        print(excel_data.names[item])
         profession = ProfessionParser(
                         name_db_table='Accountment',
                         profession_name=excel_data.names[item], 
@@ -209,4 +219,7 @@ if __name__ == "__main__":
                         profession_weight_in_level=excel_data.weights_in_level[item]
                     )
         profession.start()
-    print('Finished.')
+            # break
+    console.log("[green] Finished...")
+
+    # print('Finished.')

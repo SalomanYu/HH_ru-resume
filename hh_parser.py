@@ -84,7 +84,7 @@ class Resume:
             try:
                 if isinstance(data[0], tuple): # Условие необходимо для резюме, у которых несколько мест работы. Поэтому они возвращают список с кортежами строк для записи в БД
                     self.add_to_table(self.name_db_table, data, many_rows=True)
-                    print('Записали в таблицу инфу о списке резюме')
+                    # print('Записали в таблицу инфу о списке резюме')
                 else: # Здесь строки записываются по одному
                     self.add_to_table(self.name_db_table, data)
                 
