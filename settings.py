@@ -8,7 +8,7 @@ LOG_FILENAME = 'LOGGING/step_1.log'
 SUCCESS_MESSAGE = '\033[2;30;42m [SUCCESS] \033[0;0m' 
 WARNING_MESSAGE = '\033[2;30;43m [WARNING] \033[0;0m'
 ERROR_MESSAGE = '\033[2;30;41m [ ERROR ] \033[0;0m'
-EXCEL_PATH = "Excel/accountment_prof.xlsx"
+EXCEL_PATH = "Excel/product_manager.xlsx"
 DATABASE_NAME = 'Professions'
 
 log_file = open(LOG_FILENAME, 'w') 
@@ -27,7 +27,7 @@ class ExcelData(NamedTuple):
 
 
 def connect_to_excel() -> ExcelData:
-    last_row_num = 73
+    last_row_num = 27
 
     book_reader = xlrd.open_workbook(EXCEL_PATH)
     work_sheet = book_reader.sheet_by_name('Вариации названий')

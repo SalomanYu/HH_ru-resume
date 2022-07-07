@@ -201,25 +201,23 @@ class ProfessionParser(Resume):
 
 
 if __name__ == "__main__":
-    print("All info and statuses writes in LOGGING/step_1.log file\nProgram working....")
     excel_data = connect_to_excel()
     console = Console()
+    # console.log("[]All info and statuses writes in LOGGING/step_1.log file\nProgram working....")
     console.log("[green] Start program...")
     console.log("[blue] All info and statuses writes in LOGGING/step_1.log file...")
     # with console.status("[bold yellow]Parsing names...") as status:
         # while True:
-    for item in track(range(12, 15), description=['[green]Finding resumes by profession name ']):
+    for item in track(range(len(excel_data.names)), description=['[yellow]Progress']):
         logging.debug('Searching profession called - %s', excel_data.names[item])
-        print(excel_data.names[item])
+        # console.log(f"[green]{excel_data.names[item]}")
         profession = ProfessionParser(
-                        name_db_table='Accountment',
+                        name_db_table='productmanager',
                         profession_name=excel_data.names[item], 
                         profession_level=excel_data.levels[item],
                         profession_weight_in_group=excel_data.weights_in_group[item], 
                         profession_weight_in_level=excel_data.weights_in_level[item]
                     )
         profession.start()
-            # break
     console.log("[green] Finished...")
 
-    # print('Finished.')
