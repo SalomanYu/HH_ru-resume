@@ -16,7 +16,9 @@ console = Console()
 morph = MorphAnalyzer()
 
 option = Options()
-option.headless = True
+option.add_argument('--headless')
+option.add_argument('--no-sandbox')
+option.add_argument('--disable-dev-shm-usage')
 web = webdriver.Chrome(options=option)
 
 
