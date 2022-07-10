@@ -3,7 +3,7 @@ import os
 from typing import NamedTuple
 
 DATABASE = "shortnames_for_university"
-TABLE = "univers"
+TABLE = "univers2"
 
 class Connection(NamedTuple):
     cursor: sqlite3.Cursor
