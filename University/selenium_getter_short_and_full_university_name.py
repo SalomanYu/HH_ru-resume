@@ -3,8 +3,6 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 
-from pymorphy2 import MorphAnalyzer 
-
 import database
 from database import University
 
@@ -13,7 +11,6 @@ from rich.progress import track
 
 console = Console()
 
-morph = MorphAnalyzer()
 
 option = Options()
 option.add_argument('--headless')
@@ -38,11 +35,7 @@ def main():
             fullname = web.find_element(By.XPATH, "//h1[@class='bg-nd__h']").text
             city = web.find_element(By.XPATH, "//p[@class='bg-nd__pre']").text.strip()
             shortname = web.find_element(By.XPATH, "//div[@class='card-nd-pre-wrap']//h2").text
-            lemm_shortname = []
-            for word in shortname.split()[1:]:
-                lemm_shortname.append(morph.parse(word)[0].normal_form.upper())
-
-            database.add(University(fullname=fullname, shortname=" ".join(lemm_shortname),city=city, url=univer_url))
+            database.add(University(fullname=fullname, shortname=" ".join(shortname.split()[1:]),city=city, url=univer_url))
             web.back()
 
 if __name__ == "__main__":
