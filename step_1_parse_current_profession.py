@@ -15,7 +15,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
 from settings import * 
-from settings import logging
 
 
 class ProfessionParser(Resume):
@@ -201,6 +200,7 @@ class ProfessionParser(Resume):
 
 
 if __name__ == "__main__":
+    logging = start_logging(logfile="step_1.log")
     excel_data = connect_to_excel()
     console = Console()
     # console.log("[]All info and statuses writes in LOGGING/step_1.log file\nProgram working....")

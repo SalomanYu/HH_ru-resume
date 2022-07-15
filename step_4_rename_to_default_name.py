@@ -6,9 +6,7 @@ import json
 import xlrd 
 import ru_core_news_md
 
-
-
-from step_5_join_reset_steps_in_career import load_resumes_json, save_to_json, nested_tuple_to_dict
+import settings
 
 
 levels_dict = { # Стоит ли добавлять сюда: Владелец, Секретаря руководителя относит к 3 категории
@@ -61,7 +59,7 @@ def get_default_names(category):
 if __name__ == "__main__":
     nlp = ru_core_news_md.load()
 
-    data = load_resumes_json('JSON/step_3_groups_without_dublicates.json')
+    data = settings.load_resumes_json('JSON/step_3_groups_without_dublicates.json')
     resumes = list(data.items())
     dict_level_default_names, table_names = get_default_names(category='Маркетинг, реклама, PR') # Получаем словарь {уровень: наименование с весом 1 в уровне}
 
@@ -87,6 +85,6 @@ if __name__ == "__main__":
                                             if lemma_table_name in lemma_step_post or keyword == step['experience_post'].lower():
                                                 step['experience_post'] = dict_level_default_names[level_keyword] # Меняем название этапа
     
-    save_to_json(nested_tuple_to_dict(resumes), 'step_4_groups_with_default_names')
+    settings.save_to_json(settings.nested_tuple_to_dict(resumes), 'step_4_groups_with_default_names')
 
          

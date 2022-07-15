@@ -1,4 +1,4 @@
-from step_3_remove_repeat_groupes import load_resumes_json
+import settings
 
 def detect_similar_trajectories(data):
     resumes = list(data.items())
@@ -27,5 +27,5 @@ def detect_similar_trajectories(data):
                     print('---------')
 
 if __name__ == "__main__":
-    data = load_resumes_json('JSON/step_6_update_zero_levels.json')
+    data = settings.load_resumes_json('JSON/step_6_update_zero_levels.json')
     detect_similar_trajectories(data)

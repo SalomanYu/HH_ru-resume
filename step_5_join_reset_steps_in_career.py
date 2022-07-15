@@ -1,6 +1,5 @@
 import re
-
-from step_3_remove_repeat_groupes import nested_tuple_to_dict, save_to_json, load_resumes_json
+import settings
 
 
 class JoinDublicateSteps:
@@ -8,14 +7,14 @@ class JoinDublicateSteps:
         pass
 
     def start(self) -> None:
-        data = load_resumes_json('JSON/step_4_groups_with_default_names.json')
+        data = settings.load_resumes_json('JSON/step_4_groups_with_default_names.json')
 
         groups, dublicate_list = self.join_steps(data)
-        retransled_dict = nested_tuple_to_dict(groups)
+        retransled_dict = settings.nested_tuple_to_dict(groups)
 
         data_without_dublicate_job_steps = self.remove_repeat_steps(
             retransled_dict, dublicate_list)
-        save_to_json(data_without_dublicate_job_steps,
+        settings.save_to_json(data_without_dublicate_job_steps,
                      'step_5_groups_without_job_steps_dublicate')
 
     def join_steps(self, data) -> tuple:

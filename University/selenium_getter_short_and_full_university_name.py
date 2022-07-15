@@ -35,9 +35,9 @@ def main():
             fullname = web.find_element(By.XPATH, "//h1[@class='bg-nd__h']").text
             city = web.find_element(By.XPATH, "//p[@class='bg-nd__pre']").text.strip()
             shortname = web.find_element(By.XPATH, "//div[@class='card-nd-pre-wrap']//h2").text
-            database.add(University(fullname=fullname, shortname=" ".join(shortname.split()[1:]),city=city, url=univer_url))
+            database.add_shortnames(University(fullname=fullname, shortname=" ".join(shortname.split()[1:]),city=city, url=univer_url))
             web.back()
 
 if __name__ == "__main__":
-    database.create_table()
+    database.create_shortnames_table()
     main()

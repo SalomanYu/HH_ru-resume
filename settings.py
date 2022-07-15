@@ -1,49 +1,31 @@
 from typing import NamedTuple
 from dataclasses import dataclass
-import sqlite3
-import logging
-import xlrd
 
-LOG_FILENAME = 'LOGGING/step_1.log'
-SUCCESS_MESSAGE = '\033[2;30;42m [SUCCESS] \033[0;0m' 
-WARNING_MESSAGE = '\033[2;30;43m [WARNING] \033[0;0m'
-ERROR_MESSAGE = '\033[2;30;41m [ ERROR ] \033[0;0m'
+import sqlite3
+import xlrd
+import json
+import logging
+
+
 EXCEL_PATH = "Excel/product_manager.xlsx"
 DATABASE_NAME = 'Professions'
 
-log_file = open(LOG_FILENAME, 'w') 
-log_file.close()
+@dataclass(frozen=True, slots=True)
+class RequiredUrls:
+    category: str
+    url: str
 
-logging.basicConfig(filename=LOG_FILENAME, encoding='utf-8', level=logging.DEBUG)
-logging.getLogger("urllib3").setLevel(logging.WARNING) # Без этого urllib3 выводит страшные большие белые сообщения
-logging.getLogger('selenium').setLevel(logging.WARNING)
-
+class Variables(NamedTuple):
+    name_db: str
+    cities: set['str']
+    parsing_urls: set[RequiredUrls]
+    headers: dict
 
 class ExcelData(NamedTuple):
     names: tuple
     weights_in_level: tuple
     weights_in_group: tuple
     levels: tuple
-
-
-def connect_to_excel() -> ExcelData:
-    last_row_num = 27
-
-    book_reader = xlrd.open_workbook(EXCEL_PATH)
-    work_sheet = book_reader.sheet_by_name('Вариации названий')
-    table_titles = work_sheet.row_values(0)
-    for col_num in range(len(table_titles)):
-        match table_titles[col_num]:
-            case 'Наименование професии и различные написания':
-                table_names = work_sheet.col_values(col_num)[1:last_row_num]
-            case 'Вес профессии в уровне':
-                table_weight_in_level = work_sheet.col_values(col_num)[1:last_row_num] # 25 Включительно
-            case 'Уровень должности':
-                table_level = work_sheet.col_values(col_num)[1:last_row_num]
-            case 'Вес профессии в соответсвии':
-                table_weight_in_group = work_sheet.col_values(col_num)[1:last_row_num]
-    return ExcelData(table_names, table_weight_in_level, table_weight_in_group, table_level)
-
 
 class ResumeProfessionItem(NamedTuple):
     weight_in_group: int
@@ -92,7 +74,6 @@ class ResumeItem(NamedTuple):
     experience_post: str
     url: str
 
-
 class ResumeGroup:
     id: ResumeProfessionItem.url
     items: set[ResumeProfessionItem]
@@ -102,12 +83,10 @@ class Training(NamedTuple):
     direction: str
     year: int
 
-
 class University(NamedTuple):
     name: str
     direction: str
     year: int
-
 
 class WorkExperience(NamedTuple):
     post: str # Product manager
@@ -116,28 +95,14 @@ class WorkExperience(NamedTuple):
     subbranch: str # Разработка программного обеспечения
     duration: str # 5  лет 4 месяца
 
-
 class Experience(NamedTuple):
     global_experience: str # Например: 8 лет и 5 месяцев
     work_places: set[WorkExperience]
 
-
-@dataclass(frozen=True, slots=True)
-class RequiredUrls:
-    category: str
-    url: str
-
-
-class Variables(NamedTuple):
-    name_db: str
-    cities: set['str']
-    parsing_urls: set[RequiredUrls]
-    headers: dict
-
-
 class Connection(NamedTuple):
     cursor: sqlite3.Cursor
     db: sqlite3.Connection
+
 
 HH_VARIABLES = Variables(
     name_db='HH_RU',
@@ -165,3 +130,56 @@ HH_VARIABLES = Variables(
     ),
     headers={'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.60 Safari/537.36'}
     )
+
+
+def start_logging(logfile: str="logfile.log") -> logging:
+    log_file = open(f"LOGGING/{logfile}", 'w') 
+    log_file.close()
+
+    logging.basicConfig(filename=f"LOGGING/{logfile}", encoding='utf-8', level=logging.DEBUG)
+    logging.getLogger("urllib3").setLevel(logging.WARNING) # Без этого urllib3 выводит страшные большие белые сообщения
+    logging.getLogger('selenium').setLevel(logging.WARNING)
+    return logging
+
+def load_resumes_json(log:logging, path):
+    file = open(path)
+    data = json.load(file)
+    file.close()
+
+    # print(SUCCESS_MESSAGE + f'\tПрочитали данные с файла.')
+    log.info(f"Took json-data from {path}")
+    return data
+
+def nested_tuple_to_dict(nested_tuple:tuple) -> dict: # Вложенный кортеж в словарь
+    """Метод нужен, чтобы вернуть наши данные к исходному виду"""
+    result = {}
+    for resume in nested_tuple:
+        # Добавляем в словарь значение, в котором ключом будет являться user_id(url) резюме, а value ключа будет список всех этапов работы
+        result[resume[0]] = resume[1] 
+    
+    return result
+
+def save_to_json(log:logging, data:list[dict], filename:str) -> None:
+    with open(f'JSON/{filename}', 'w') as file:
+        json.dump(data, file, ensure_ascii=False, indent=2)
+    log.info("%s saved!", filename)
+
+
+def connect_to_excel() -> ExcelData:
+    last_row_num = 27
+
+    book_reader = xlrd.open_workbook(EXCEL_PATH)
+    work_sheet = book_reader.sheet_by_name('Вариации названий')
+    table_titles = work_sheet.row_values(0)
+    for col_num in range(len(table_titles)):
+        match table_titles[col_num]:
+            case 'Наименование професии и различные написания':
+                table_names = work_sheet.col_values(col_num)[1:last_row_num]
+            case 'Вес профессии в уровне':
+                table_weight_in_level = work_sheet.col_values(col_num)[1:last_row_num] # 25 Включительно
+            case 'Уровень должности':
+                table_level = work_sheet.col_values(col_num)[1:last_row_num]
+            case 'Вес профессии в соответсвии':
+                table_weight_in_group = work_sheet.col_values(col_num)[1:last_row_num]
+    return ExcelData(table_names, table_weight_in_level, table_weight_in_group, table_level)
+

@@ -16,8 +16,14 @@ class University(NamedTuple):
     city: str
     url: str
 
+class JsonUniversity(NamedTuple):
+    hh_name: str
+    best_choice: str
+    similarity: int
+    is_current: bool
 
-def connect_to_db() -> Connection:
+
+def connect_to_shortnames_db() -> Connection:
     os.makedirs(name='SQL', exist_ok=True)
     db = sqlite3.connect(f'SQL/{DATABASE}.db')
     cursor = db.cursor()
@@ -25,8 +31,8 @@ def connect_to_db() -> Connection:
 
 
 # connect_to_db('hello')
-def create_table() -> None:
-    cursor, db = connect_to_db()
+def create_shortnames_table() -> None:
+    cursor, db = connect_to_shortnames_db()
 
     pattern = f"""
         CREATE TABLE IF NOT EXISTS {TABLE}(
@@ -42,8 +48,8 @@ def create_table() -> None:
     db.close()
 
 
-def add(data: University) -> None:
-    cursor, db = connect_to_db()
+def add_shortnames(data: University) -> None:
+    cursor, db = connect_to_shortnames_db()
     pattern = f"""
         INSERT INTO {TABLE}(
             fullname,

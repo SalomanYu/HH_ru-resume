@@ -2,7 +2,8 @@
 Нам нужно определить средний профессиональный опыт с которым кандидат может претендовать на должность (Junior, Middle, Senior) уровней.
 """
 
-from step_3_remove_repeat_groupes import load_resumes_json, save_to_json
+import settings
+# from step_3_remove_repeat_groupes import load_resumes_json, save_to_json
 from step_4_rename_to_default_name import get_default_names
 from how_time_is_required_for import experience_to_months
 
@@ -85,10 +86,10 @@ def save_update_zero_professions(zero_professions:dict, original_data:dict) -> d
                 except BaseException:
                     continue
 
-    save_to_json(original_data, 'step_6_update_zero_levels')
+    settings.save_to_json(original_data, 'step_6_update_zero_levels')
 
 def main():
-    data = load_resumes_json('JSON/step_5_groups_without_job_steps_dublicate.json')
+    data = settings.load_resumes_json('JSON/step_5_groups_without_job_steps_dublicate.json')
     dict_with_experience_statistic = detect_experience(data)
 
     updated_zero_professions = change_level_for_zero_positions(dict_with_experience_statistic)
