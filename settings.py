@@ -1,5 +1,8 @@
+import os
+import re
 from typing import NamedTuple
 from dataclasses import dataclass
+from datetime import date
 
 import sqlite3
 import xlrd
@@ -7,8 +10,17 @@ import json
 import logging
 
 
-EXCEL_PATH = "Excel/product_manager.xlsx"
-DATABASE_NAME = 'Professions'
+STEP_2_JSON_FILE = "JSON/step_2_groups_result.json"
+STEP_3_JSON_FILE = "JSON/step_3_groups_without_duplicates.json"
+STEP_4_JSON_FILE = "JSON/step_4_groups_with_default_names.json"
+STEP_5_JSON_FILE = "JSON/step_5_groups_without_job_steps.json"
+STEP_6_JSON_FILE = "JSON/step_6_update_zero_levels.json"
+
+
+# EXCEL_PATH = "Excel/product_manager.xlsx"
+DATABASE_NAME = 'HeadHunterProfessions.db'
+PROFESSIONS_FOLDER_PATH = "/home/yunoshev/Documents/Edwica/Resumes/HH_ru-resume/Professions" 
+CURRENT_MONTH = f"{date.today().month}.{date.today().year}" # для истории создается папка с текущей датой
 
 @dataclass(frozen=True, slots=True)
 class RequiredUrls:
@@ -23,6 +35,7 @@ class Variables(NamedTuple):
 
 class ExcelData(NamedTuple):
     names: tuple
+    area: str
     weights_in_level: tuple
     weights_in_group: tuple
     levels: tuple
@@ -31,8 +44,8 @@ class ResumeProfessionItem(NamedTuple):
     weight_in_group: int
     level: int
     weight_in_level: int
+    area: str
     name: str
-    category: str
     city: str
     general_experience: str
     specialization: str
@@ -50,11 +63,11 @@ class ResumeProfessionItem(NamedTuple):
     experience_interval: str
     experience_duration: str
     experience_post: str
+    dateUpdate: str
     url: str
 
 class ResumeItem(NamedTuple):
     name: str
-    category: str
     city: str
     general_experience: str
     specialization: str
@@ -103,6 +116,10 @@ class Connection(NamedTuple):
     cursor: sqlite3.Cursor
     db: sqlite3.Connection
 
+class CurrentSearchItem(NamedTuple):
+    url: str
+    dateUpdate: str
+
 
 HH_VARIABLES = Variables(
     name_db='HH_RU',
@@ -132,16 +149,19 @@ HH_VARIABLES = Variables(
     )
 
 
-def start_logging(logfile: str="logfile.log") -> logging:
-    log_file = open(f"LOGGING/{logfile}", 'w') 
+def start_logging(logfile: str="logfile.log", folder:str="undetinfied") -> logging:
+    folder_path = os.path.join("LOGGING", CURRENT_MONTH, folder)
+    os.makedirs(folder_path, exist_ok=True)
+    logfile_path = os.path.join(folder_path, logfile)
+    log_file = open(logfile_path, 'w') 
     log_file.close()
 
-    logging.basicConfig(filename=f"LOGGING/{logfile}", encoding='utf-8', level=logging.DEBUG)
+    logging.basicConfig(filename=logfile_path, encoding='utf-8', level=logging.DEBUG, format='%(asctime)s  %(name)s  %(levelname)s: %(message)s')
     logging.getLogger("urllib3").setLevel(logging.WARNING) # Без этого urllib3 выводит страшные большие белые сообщения
     logging.getLogger('selenium').setLevel(logging.WARNING)
     return logging
 
-def load_resumes_json(log:logging, path):
+def load_resumes_json(log:logging, path:str):
     file = open(path)
     data = json.load(file)
     file.close()
@@ -160,26 +180,27 @@ def nested_tuple_to_dict(nested_tuple:tuple) -> dict: # Вложенный ко�
     return result
 
 def save_to_json(log:logging, data:list[dict], filename:str) -> None:
-    with open(f'JSON/{filename}', 'w') as file:
+    with open(filename, 'w') as file:
         json.dump(data, file, ensure_ascii=False, indent=2)
     log.info("%s saved!", filename)
 
 
-def connect_to_excel() -> ExcelData:
-    last_row_num = 27
-
-    book_reader = xlrd.open_workbook(EXCEL_PATH)
+def connect_to_excel(path:str) -> ExcelData:
+    profession_area = re.sub("\d+", '', path).split('/')[-1].split(".xlsx")[0].strip().replace(" ", '_')
+    book_reader = xlrd.open_workbook(path)
     work_sheet = book_reader.sheet_by_name('Вариации названий')
     table_titles = work_sheet.row_values(0)
+    
     for col_num in range(len(table_titles)):
         match table_titles[col_num]:
             case 'Наименование професии и различные написания':
-                table_names = work_sheet.col_values(col_num)[1:last_row_num]
+                table_names = [name for name in work_sheet.col_values(col_num)[1:] if name != '']
+            # case 'Профобласть':
+                # table_area = work_sheet.col_values(col_num)[1]
             case 'Вес профессии в уровне':
-                table_weight_in_level = work_sheet.col_values(col_num)[1:last_row_num] # 25 Включительно
-            case 'Уровень должности':
-                table_level = work_sheet.col_values(col_num)[1:last_row_num]
+                table_weight_in_level = [weight for weight in work_sheet.col_values(col_num)[1:] if weight != ''] # 25 Включительно
             case 'Вес профессии в соответсвии':
-                table_weight_in_group = work_sheet.col_values(col_num)[1:last_row_num]
-    return ExcelData(table_names, table_weight_in_level, table_weight_in_group, table_level)
-
+                table_weight_in_group = [weight for weight in work_sheet.col_values(col_num)[1:] if weight != '']
+            case 'Уровень должности':
+                table_level = [level for level in work_sheet.col_values(col_num)[1:] if level != '']
+    return ExcelData(table_names, profession_area, table_weight_in_level, table_weight_in_group, table_level)

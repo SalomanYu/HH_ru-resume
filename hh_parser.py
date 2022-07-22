@@ -15,7 +15,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 
-from settings import HH_VARIABLES, Experience, ResumeItem, Training, University, WorkExperience
+from settings import HH_VARIABLES, Experience, ResumeItem, Training, University, WorkExperience, CurrentSearchItem
 from settings import logging
 import settings
 
@@ -23,9 +23,8 @@ import settings
 class Resume:
     def __init__(self):
         self.page_url = None
-        self.name_db_table = 'Resumes'
-        self.address = None
         self.city = None
+        self.name_db_table = 'Resumes'
         self.name_database = HH_VARIABLES.name_db
         self.cities = HH_VARIABLES.cities
         self.parsing_urls = HH_VARIABLES.parsing_urls
@@ -39,7 +38,6 @@ class Resume:
         for self.city in self.cities: # Отбираем каждый город из списка по отдельности
             
             for item in range(len(self.parsing_urls)): # Запускаем цикл по отфильтрованным по ссылкам категории
-                self.address = ''
                 logging.info("City, were are finding - %s", self.city)
                 # Этот цикл отвечает за перелистывание страниц
                 url = f'https://{self.city}.hh.ru' + self.parsing_urls[item].url
@@ -72,9 +70,11 @@ class Resume:
             logging.debug("Let`s try to connect in two minute")            
             time.sleep(120)
 
-    def parse_resume(self, url: str) -> tuple:
+    def parse_resume(self, resume: CurrentSearchItem) -> tuple:
         """Функция запускает методы парсинга отдельных блоков резюме и передает результат в виде списка или списка кортежей функции data_resume_list"""
 
+        url, self.resume_dateUpdate = resume
+        print(f"{self.resume_dateUpdate}")
         logging.info('Parsing resume...')
         try:
             self.req = requests.get(url, headers=self.headers)
@@ -112,7 +112,7 @@ class Resume:
         if len(work_periods) > 0:
             res = []
             for work in work_periods: # Пробегаемся по количеству мест работы 
-                res.append(ResumeItem(name=title, category=self.address, city=self.city, 
+                res.append(ResumeItem(name=title, city=self.city, 
                                 general_experience=experience, specialization=specializations, salary=self.salary,
                                 university_name=univer.name, university_direction=univer.direction, university_year=univer.year,
                                 languages=languages, skills=key_skills, training_name=training.name, training_direction=training.direction,
@@ -120,7 +120,7 @@ class Resume:
                                 experience_duration=work.duration, experience_post=work.post, url=url))
             return res 
         else: # Вариант, когда нет опыта работы
-            return  ResumeItem(name=title, category=self.address, city=self.city, 
+            return  ResumeItem(name=title, city=self.city, 
                                 general_experience=experience, specialization=specializations, salary=self.salary,
                                 university_name=univer.name, university_direction=univer.direction, university_year=univer.year,
                                 languages=languages, skills=key_skills, training_name=training.name, training_direction=training.direction,
@@ -343,11 +343,11 @@ class Resume:
        
         self.db_name = db_name
         today = date.today()
-        month_folder = f'SQL/Month:{str(today.month)}.{str(today.year)}' # For history check
+        month_folder = f'SQL/{str(today.month)}.{str(today.year)}' # For history check
         os.makedirs(month_folder, exist_ok=True) # Создаем папку SQL, если она еще не создана
 
         # Будет создана База данных, если в папке SQL не будет файла db_name.db
-        db = sqlite3.connect(f'{month_folder}/{self.db_name}.db') 
+        db = sqlite3.connect(f'{month_folder}/{self.db_name}') 
         cursor = db.cursor()
         return cursor, db
         
@@ -361,7 +361,6 @@ class Resume:
             CREATE TABLE IF NOT EXISTS {name}(
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name_of_profession VARCHAR(255),
-                category_resume VARCHAR (50),
                 city VARCHAR(50),
                 general_experience VARCHAR(50),
                 specialization VARCHAR(255),
@@ -391,7 +390,7 @@ class Resume:
         Отличия в том, что резюме с несколькими строками означает, что в резюме
         указано несколько мест работы и для удобства их нужно разместить на разных строках"""
         cursor, db = self.connect_to_db(self.name_database)
-        pattern = f"INSERT INTO {name}(name_of_profession, category_resume, city, general_experience, specialization, salary, higher_education_university,"\
+        pattern = f"INSERT INTO {name}(name_of_profession, city, general_experience, specialization, salary, higher_education_university,"\
                     "higher_education_direction, higher_education_year, languages, skills, advanced_training_name, advanced_training_direction," \
                     f"advanced_training_year, branch, subbranch, experience_interval, experience_duration, experience_post, url) VALUES({','.join('?' for i in range(20))})"
 

@@ -1,21 +1,25 @@
 import json
 import sqlite3
 import os
+import logging
 
+import settings
 from settings import Connection, ResumeProfessionItem, ResumeGroup, start_logging
 
 
 class SelectData:
-    def __init__(self, db_path: str, file_output_name: str):
+    def __init__(self, db_path: str, db_table: str, file_output_name: str, log: logging):
         self.path = db_path
+        self.db_table = db_table
         self.file_output_name = file_output_name
+        self.log = log
 
     def collect(self) -> None:
         """Основной метод, который запускает все остальные функции"""
         data = self.select_all_rows()
         groups = self.group_user_ids_to_dict(data)
         self.save_to_json(groups)
-        log.info("Complete!")
+        self.log.info("Complete!")
 
     def connect_to_db(self, path: str) -> Connection:
         try:
@@ -24,28 +28,27 @@ class SelectData:
 
             db = sqlite3.connect(path)
             cursor = db.cursor()
-            log.info("Successfully connected to Database: %s", path)
+            self.log.info("Successfully connected to Database: %s", path)
             return Connection(cursor=cursor, db=db)
 
         except sqlite3.Error as error:
-            log.error("Failed connecting to Database: %s", path)
-            log.error("Error message: %s", error)
+            self.log.error("Failed connecting to Database: %s", path)
+            self.log.error("Error message: %s", error)
             exit("Failed connecting to Database")
         
         except FileExistsError:
-            log.error("Database None-exists! %s", path)
-            exit("Database None-exists!")
+            self.log.error("Database None-exists! %s", path)
+            exit(f"[ERROR] Database None-exists: {path}")
 
 
     def select_all_rows(self) -> list[ResumeProfessionItem]:
         cur = self.connect_to_db(self.path).cursor
-        cur.execute('SELECT * FROM resumes')
-
+        cur.execute(f'SELECT * FROM {self.db_table}')
         fields = [
-            'weight_in_group', 'level', 'level_in_group', 'name_of_profession', 'category_resume', 'city', 'general_experience', 'specialization',
+            'id', 'weight_in_group', 'level', 'level_in_group', 'name_of_profession', 'city', 'general_experience', 'specialization',
             'salary', 'higher_education_university', 'higher_education_direction', 'higher_education_year', 'languages', 'skills', 'advanced_training_name',
             'advanced_training_direction', 'advanced_training_year', 'branch', 'subbranch', 'experience_interval', 'experience_duration', 'experience_post', 'user_id(url)']
-        resumes = [dict(zip(fields, resume[1:])) for resume in cur.fetchall()] # [1:] чтобы не брать айди
+        resumes = [dict(zip(fields, resume)) for resume in cur.fetchall()] # [1:] чтобы не брать айди
         
         return resumes
         
@@ -58,7 +61,6 @@ class SelectData:
                 is_repeat_resume = False
                 for elem in groups_dict[url]:
                     if row['experience_interval'] == elem['experience_interval'] and row['experience_post'] == elem['experience_post']:
-                        print("fdsfsdfds")
                         is_repeat_resume = True
                         break
                 if not is_repeat_resume:
@@ -78,7 +80,8 @@ class SelectData:
 if __name__ == "__main__":
     log = start_logging(logfile="step_2.log")
     collector = SelectData(
-        db_path='/home/yunoshev/Documents/Edwica/Resumes/result_server/SQL/(2022_6).db',
-        file_output_name='step_2_groups_result'
+        db_path='/home/yunoshev/Documents/Edwica/Resumes/result_server/SQL/Professions(2022_6).dbcolle',
+        file_output_name=settings.STEP_2_JSON_FILE,
+        log=log
     )
     collector.collect()

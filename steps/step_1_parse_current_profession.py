@@ -1,3 +1,4 @@
+from xml.dom import NotFoundErr
 from hh_parser import Resume
 
 from rich.console import Console
@@ -16,22 +17,28 @@ from selenium.webdriver.common.keys import Keys
 
 from settings import * 
 
+import locale
+from datetime import datetime 
+
 
 class ProfessionParser(Resume):
-    def __init__(self, name_db_table: str,  profession_name:str, profession_level:int, profession_weight_in_level:int, profession_weight_in_group:int):
+    def __init__(self, name_db_table: str,  profession_name:str, profession_area:str, profession_level:int, profession_weight_in_level:int, profession_weight_in_group:int):
         
         super().__init__()
-        self.profession_name = profession_name
-        self.profession_weight_in_group = profession_weight_in_group
-        self.profession_weight_in_level = profession_weight_in_level
-        self.profession_level = profession_level
+        self.profession_name = profession_name # Название профессии из базы данных для поиска в hh.ru
+        self.profession_area = profession_area.replace("_", " ") # Профобласть профессии
+        self.profession_level = profession_level # Уровень профессии
+        self.profession_weight_in_group = profession_weight_in_group # Вес профессии в группе, пригодится для того, чтобы определять самую главную профессию в базе
+        self.profession_weight_in_level = profession_weight_in_level # Вес профессии в уровне, пригодится для того, чтобы определять дефолтные значения для профессий одного уровня
 
-        self.address = '' # категория
-        self.name_db_table = name_db_table
+        self.name_db_table = name_db_table.replace(".", "_") # В названии таблицы не должно быть точек
         self.name_database = DATABASE_NAME
 
-    def start(self):
+        self.current_page_btn_active = 1
+        self.page_step = 1
 
+    def find(self):
+        print(f"{self.name_db_table}")
         self.create_table(self.name_db_table)
         self.domain = 'https://hh.ru/search/resume'
         self.search(self.domain)
@@ -46,49 +53,71 @@ class ProfessionParser(Resume):
         browser.get(url)
         browser.implicitly_wait(5)
 
-
         search_input = browser.find_element(By.XPATH, "//input[@id='a11y-search-input']")
         search_input.click()
         search_input.send_keys(self.profession_name)
         search_input.send_keys(Keys.ENTER)
-        browser.implicitly_wait(2)
+        browser.implicitly_wait(5)
         
         search_result_url = browser.current_url
         browser.quit()
         page = 0
+
         while True:
             logging.info("Page num: %d", page+1)
-            if self.parser_resume_list(search_result_url + f"&page={page}"):            
-                page += 1
+            if self.parser_resume_list(search_result_url + f"&page={page}"):  
+                page += self.page_step   
             elif self.parser_resume_list(search_result_url + f"?page={page}"):
-                page += 1
+                page += self.page_step
             else:
                 logging.warning("Pages finished.")
                 return False
-            break
+
     
-    def find_required_resumes(self, url):
+    def find_required_resumes(self, url) -> tuple[list[CurrentSearchItem], int]:
         try:
             req = requests.get(url, headers=self.headers)
+            if req.status_code != 200:
+                raise NotFoundErr
+
             soup = BeautifulSoup(req.text, 'lxml')
-            all_resumes = soup.find_all('a', class_='resume-search-item__name')
-            resume_urls_list = []
+            try:
+                pressed_page_btn = int(soup.find("span", class_='bloko-button bloko-button_pressed').text)
+                if self.current_page_btn_active != pressed_page_btn:
+                    raise NotFoundErr
+            except AttributeError:
+                raise NotFoundErr
+
+            self.current_page_btn_active += self.page_step
+            all_resumes = soup.find_all("div", class_='resume-search-item__content-wrapper')
+
+            resume_urls_list = [] # Подходящие резюме
             for item in all_resumes:
-                if item.text.lower() == self.profession_name.lower():
-                    resume_urls_list.append(f"https://hh.ru{item['href']}")
-            # for item in track(range(len(all_resumes)), description="[green]Finding required resumes"):
-            #     if all_resumes[item].text.lower() == self.profession_name.lower():
-            #         resume_urls_list.append(f"https://hh.ru{all_resumes[item]['href']}")
+                resume_title = item.find("a", class_="serp-item__name")
+                if resume_title.text.lower().strip() == self.profession_name.lower().strip():
+                    resume_link = "https://hh.ru" + resume_title["href"]
+                    try:
+                        string_data = item.find("span", class_='date--cHInIjOdiyfDqTabYRkp').text.replace("Обновлено", "").strip()
+                        # locale.setlocale(locale.LC_TIME, 'ru_RU.UTF-8')
+                        # resume_date_update = datetime.strptime(string_data, "%d %B %Y %H:%M")
+                        resume_date_update = string_data # Пока так оставим 
+                    except AttributeError:
+                        resume_date_update = ""
+                    resume_urls_list.append(CurrentSearchItem(resume_link, resume_date_update))
             return resume_urls_list, len(all_resumes)
             
-        except (BaseException, requests.exceptions.ConnectionError) as err:
+        except requests.exceptions.ConnectionError:
             logging.error("Internet-connection failed.")            
             logging.debug("Let`s try to connect in two minute")            
-            sleep(120)
+            sleep(2)
+            raise NotFoundErr
+        
+        except NotFoundErr:
+            return [], 0
 
     def parser_resume_list(self, url):
         resume_urls_list, count_resumes_in_page = self.find_required_resumes(url)
-        logging.info("Started four processes for parsing")
+        logging.info("Try to start four processes for parsing")
         with Pool(4) as process:
                 process.map_async(  func=self.parse_resume, # Функция, которая будет вызываться с аргументом
                                     iterable=resume_urls_list, # Список аргументов, которые будут передаваться по очереди
@@ -97,7 +126,7 @@ class ProfessionParser(Resume):
                 process.close()
                 process.join()
         
-        if len(resume_urls_list) > 0 or count_resumes_in_page > 0: return True
+        if count_resumes_in_page != 0: return True
         else: return False
             
 
@@ -125,23 +154,23 @@ class ProfessionParser(Resume):
             for work in work_periods: # Пробегаемся по количеству мест работы 
                 res.append(ResumeProfessionItem(
                     weight_in_group=self.profession_weight_in_group, level=self.profession_level, 
-                    weight_in_level=self.profession_weight_in_level, name=self.profession_name, category=self.address,
+                    weight_in_level=self.profession_weight_in_level, name=self.profession_name, area=self.profession_area,
                     city=city, general_experience=experience, specialization=specializations, salary=self.salary,
                     university_name=univer.name, university_direction=univer.direction, university_year=univer.year,
                     languages=languages, skills=key_skills, training_name=training.name, training_direction=training.direction,
                     training_year=training.year, branch=work.branch, subbranch=work.subbranch, experience_interval=work.interval,
-                    experience_duration=work.duration, experience_post=work.post, url=url))
+                    experience_duration=work.duration, experience_post=work.post, dateUpdate=self.resume_dateUpdate, url=url))
                 
             return res 
         else: # Вариант, когда нет опыта работы
             return ResumeProfessionItem(
                     weight_in_group=self.profession_weight_in_group, level=self.profession_level, 
-                    weight_in_level=self.profession_weight_in_level, name=self.profession_name, category=self.address,
+                    weight_in_level=self.profession_weight_in_level, name=self.profession_name, area=self.profession_area,
                     city=city, general_experience=experience, specialization=specializations, salary=self.salary,
                     university_name=univer.name, university_direction=univer.direction, university_year=univer.year,
                     languages=languages, skills=key_skills, training_name=training.name, training_direction=training.direction,
                     training_year=training.year, branch='', subbranch='', experience_interval='',experience_duration='',
-                    experience_post='', url=url)
+                    experience_post='', dateUpdate=self.resume_dateUpdate, url=url)
     
     def create_table(self, name):
         cursor, db = self.connect_to_db(self.name_database)
@@ -152,8 +181,8 @@ class ProfessionParser(Resume):
                 weight_in_group INT,
                 level INT,
                 level_in_group INT,
+                area,
                 name_of_profession VARCHAR(255),
-                category_resume VARCHAR (50),
                 city VARCHAR(50),
                 general_experience VARCHAR(50),
                 specialization VARCHAR(255),
@@ -171,6 +200,7 @@ class ProfessionParser(Resume):
                 experience_interval VARCHAR(50),
                 experience_duration VARCHAR(50),
                 experience_post VARCHAR(255),
+                dateUpdate VARCHAR(30),
                 url VARCHAR(255)
                 );
             """
@@ -182,9 +212,9 @@ class ProfessionParser(Resume):
     def add_to_table(self, name, data,many_rows=False):
         cursor, db = self.connect_to_db(self.name_database)
 
-        pattern = f"INSERT INTO {name}(weight_in_group, level, level_in_group, name_of_profession, category_resume, city, general_experience, specialization, salary, higher_education_university,"\
+        pattern = f"INSERT INTO {name}(weight_in_group, level, level_in_group, area, name_of_profession, city, general_experience, specialization, salary, higher_education_university,"\
             "higher_education_direction, higher_education_year, languages, skills, advanced_training_name, advanced_training_direction," \
-            f"advanced_training_year, branch, subbranch, experience_interval, experience_duration, experience_post, url) VALUES({','.join('?' for i in range(23))})"
+            f"advanced_training_year, branch, subbranch, experience_interval, experience_duration, experience_post, dateUpdate, url) VALUES({','.join('?' for i in range(24))})"
 
         if many_rows: 
             cursor.executemany(pattern, data) # Результат выполнения команды в скобках VALUES превратится в VALUES(?,?,?, ?n), n = len(data)
@@ -203,21 +233,17 @@ if __name__ == "__main__":
     logging = start_logging(logfile="step_1.log")
     excel_data = connect_to_excel()
     console = Console()
-    # console.log("[]All info and statuses writes in LOGGING/step_1.log file\nProgram working....")
     console.log("[green] Start program...")
     console.log("[blue] All info and statuses writes in LOGGING/step_1.log file...")
-    # with console.status("[bold yellow]Parsing names...") as status:
-        # while True:
     for item in track(range(len(excel_data.names)), description=['[yellow]Progress']):
         logging.debug('Searching profession called - %s', excel_data.names[item])
-        # console.log(f"[green]{excel_data.names[item]}")
         profession = ProfessionParser(
-                        name_db_table='productmanager',
+                        name_db_table="",
                         profession_name=excel_data.names[item], 
                         profession_level=excel_data.levels[item],
                         profession_weight_in_group=excel_data.weights_in_group[item], 
                         profession_weight_in_level=excel_data.weights_in_level[item]
                     )
-        profession.start()
+        profession.find()
     console.log("[green] Finished...")
 

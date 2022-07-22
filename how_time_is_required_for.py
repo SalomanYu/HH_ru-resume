@@ -1,4 +1,4 @@
-from step_3_remove_repeat_groupes import load_resumes_json
+import settings
 import re
 
 def get_min_and_max_join_steps(resumes):
@@ -101,7 +101,8 @@ def get_average_duration(resumes):
     return average_junior, average_middle, average_senior
 
 if __name__ == "__main__":
-    data = load_resumes_json(path='JSON/step_5_groups_without_job_steps_dublicate.json')
+    log = settings.start_logging("step_how_is_required_for.log")
+    data = settings.load_resumes_json(log=log, path='JSON/step_5_groups_without_job_steps_dublicate.json')
     resumes = list(data.items())
 
     average_junior, average_middle, average_senior = get_average_duration(resumes)

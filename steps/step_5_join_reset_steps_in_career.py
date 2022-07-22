@@ -6,16 +6,15 @@ class JoinDublicateSteps:
     def __init__(self):
         pass
 
-    def start(self) -> None:
-        data = settings.load_resumes_json('JSON/step_4_groups_with_default_names.json')
+    def start(self, log) -> None:
+        data = settings.load_resumes_json(log, settings.STEP_4_JSON_FILE)
 
         groups, dublicate_list = self.join_steps(data)
         retransled_dict = settings.nested_tuple_to_dict(groups)
 
         data_without_dublicate_job_steps = self.remove_repeat_steps(
             retransled_dict, dublicate_list)
-        settings.save_to_json(data_without_dublicate_job_steps,
-                     'step_5_groups_without_job_steps_dublicate')
+        settings.save_to_json(log, data_without_dublicate_job_steps, settings.STEP_5_JSON_FILE)
 
     def join_steps(self, data) -> tuple:
         groups = list(data.items())
@@ -33,9 +32,6 @@ class JoinDublicateSteps:
                     branch_second = career_steps[step_two]['branch']
 
                     if branch_first.lower().strip() == branch_second.lower().strip() or (branch_first.strip() == '' or branch_second.strip() == ''):
-                        # subbranch_first = career_steps[step_one]['subbranch']
-                        # subbranch_second = career_steps[step_two]['subbranch']
-                        # if subbranch_first.lower().strip() == subbranch_second.lower().strip():
                         # Объединяем этапы
                         print(post_first, post_second, groups[resume_num][0])
 
@@ -47,7 +43,7 @@ class JoinDublicateSteps:
                         dublicate_list.append(career_steps[step_one]['id'])
                         career_steps[step_two]['experience_interval'] = merged_interval
                         career_steps[step_two]['experience_duration'] = merged_duration
-        quit()
+        # quit()
         return groups, dublicate_list
 
     def merge_durations(self, career_steps, step_one, step_two) -> str:
@@ -116,7 +112,6 @@ class JoinDublicateSteps:
         return ' '.join((years, year_type, months, month_type))
 
     def remove_repeat_steps(self, data, list_to_remove):
-        # print(list_to_remove)
         for key in data:
             try:
                 for step_num in range(len(data[key])):
@@ -135,5 +130,6 @@ class JoinDublicateSteps:
 
 
 if __name__ == "__main__":
+    log = settings.start_logging("step_5.log")
     step5 = JoinDublicateSteps()
     step5.start()

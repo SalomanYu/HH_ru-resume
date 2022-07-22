@@ -27,5 +27,5 @@ def detect_similar_trajectories(data):
                     print('---------')
 
 if __name__ == "__main__":
-    data = settings.load_resumes_json('JSON/step_6_update_zero_levels.json')
+    data = settings.load_resumes_json(settings.STEP_6_JSON_FILE)
     detect_similar_trajectories(data)

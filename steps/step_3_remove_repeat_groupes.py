@@ -2,10 +2,11 @@
 """
 
 import json
+import logging
 import settings
 
 
-def filtering_groups(data) -> tuple:
+def filtering_groups(log:logging, data) -> tuple:
     """
         This method будет искать индентичные группы. Путем сравнения двух резюме, мы будем узнавать уровень схожести двух резюме
     В основе лежит цикл - один ко многим, в котором мы пытаемся набрать необходимое количество очков для того,
@@ -98,7 +99,7 @@ def filtering_groups(data) -> tuple:
 
 
 
-def remove_dublicates(data:dict, list_to_delete: list) -> dict:
+def remove_dublicates(log:logging, data:dict, list_to_delete: list) -> dict:
     if list_to_delete:
         log.warning("Finded %d duplicates", len(list_to_delete))
     else:
@@ -114,9 +115,9 @@ def remove_dublicates(data:dict, list_to_delete: list) -> dict:
 if __name__ == "__main__":
     log = settings.start_logging(logfile="step_3.log")
 
-    data = settings.load_resumes_json(log, 'JSON/step_2_groups_result.json')
+    data = settings.load_resumes_json(log, settings.STEP_2_JSON_FILE)
     groups, dublicate_list = filtering_groups(data)
     retransled_dict = settings.nested_tuple_to_dict(nested_tuple=groups)
 
     data_without_dublicates = remove_dublicates(data=retransled_dict, list_to_delete=dublicate_list)
-    settings.save_to_json(log, data_without_dublicates, 'step_3_groups_without_dublicates.json')
+    settings.save_to_json(log, data_without_dublicates, settings.STEP_3_JSON_FILE)
